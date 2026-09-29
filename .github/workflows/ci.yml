@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python pin ${{ matrix.python-version }}
+      - run: uv sync --extra dev --extra export
+      - run: uv run ruff check
+      - run: uv run ruff format --check
+      - run: uv run mypy src
+      - run: uv run pytest tests -m "not live" --cov=tapdrop --cov-report=term-missing
+
+  live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --extra dev --extra export
+      - run: uv run pytest tests -m live
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Build only. Publishing to ghcr.io is a manual step, per RDD.md.
+      - run: docker build -t tapdrop:ci .
+      - run: docker run --rm tapdrop:ci --version

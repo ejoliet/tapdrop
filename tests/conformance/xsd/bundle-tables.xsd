@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Not an IVOA schema. VOSITables defines the wrapper element; the table and
+     column types it uses come from VODataService, so both are compiled here. -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:import namespace="http://www.ivoa.net/xml/VOSITables/v1.0"
+             schemaLocation="VOSITables-v1.0.xsd"/>
+  <xs:import namespace="http://www.ivoa.net/xml/VODataService/v1.1"
+             schemaLocation="VODataService-v1.1.xsd"/>
+</xs:schema>

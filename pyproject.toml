@@ -1,0 +1,126 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tapdrop"
+version = "1.0.0"
+description = "Temporary, shareable, standards-compliant IVOA TAP endpoint over files in place"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Emmanuel Joliet" }]
+keywords = ["astronomy", "ivoa", "tap", "adql", "vo", "duckdb"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Astronomy",
+]
+
+dependencies = [
+    "astropy>=6.0",
+    "cdshealpix>=0.7",
+    "duckdb>=1.1",
+    "fastapi>=0.115",
+    "fsspec>=2024.6",
+    "httpx>=0.27",
+    "mocpy>=0.16",
+    "numpy>=1.26",
+    "pyarrow>=16",
+    "pydantic-settings>=2.4",
+    "python-multipart>=0.0.9",
+    "pyyaml>=6.0",
+    "qrcode>=7.4",
+    "s3fs>=2024.6",
+    "sqlglot>=25.0",
+    "typer>=0.12",
+    "uvicorn[standard]>=0.30",
+]
+
+[project.optional-dependencies]
+roman = [
+    "asdf>=3.3",
+    "asdf-astropy>=0.6",
+    "gwcs>=0.21",
+    "roman-datamodels>=0.21",
+]
+dev = [
+    "lxml>=5.2",
+    "moto[s3,server]>=5.0",
+    "mypy>=1.11",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=5.0",
+    "pyvo>=1.5",
+    "ruff>=0.6",
+    "types-pyyaml>=6.0",
+]
+export = [
+    "caom2>=2.6",
+]
+
+[project.scripts]
+tapdrop = "tapdrop.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/ejoliet/tapdrop"
+Source = "https://github.com/ejoliet/tapdrop"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tapdrop"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+# ruff format rewrites Python inside fenced markdown blocks. RDD.md is the spec
+# and its snippets are the contract, so keep the formatter out of markdown.
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
+ignore = ["B008"]  # typer uses function calls in argument defaults by design
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
+
+[tool.mypy]
+# No python_version pin: it makes mypy parse dependency stubs (numpy) under an
+# older grammar than the interpreter running them. CI covers 3.11 and 3.12.
+strict = true
+files = ["src"]
+plugins = []
+
+[[tool.mypy.overrides]]
+module = [
+    "asdf.*",
+    "astropy.*",
+    "caom2.*",
+    "cdshealpix.*",
+    "duckdb.*",
+    "fsspec.*",
+    "gwcs.*",
+    "mocpy.*",
+    "moto.*",
+    "pyarrow.*",
+    "pyvo.*",
+    "qrcode.*",
+    "roman_datamodels.*",
+    "s3fs.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "live: end-to-end tests that start a real uvicorn server",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["tapdrop"]
+branch = true

@@ -1,0 +1,9 @@
+tables:
+  override_src.widget:
+    description: Override test table
+    ra: x
+    dec: y
+    columns:
+      x:
+        unit: deg
+        description: Longitude override

@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tapdrop</title>
+<style>
+  :root{
+    --bg:#0a0e12;
+    --surface:#10161d;
+    --surface-2:#161e27;
+    --border:#243040;
+    --border-2:#31404f;
+    --text:#dbe4ec;
+    --muted:#7d8b9a;
+    --accent:#33d6c0;
+    --accent-dim:#1a5f56;
+    --warn:#f0a83c;
+    --err:#ff6b6a;
+    --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+    --radius:6px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--mono);
+    font-size:14px;
+    line-height:1.5;
+    min-height:100vh;
+  }
+  a{color:var(--accent);}
+  .wrap{max-width:1100px;margin:0 auto;padding:28px 20px 60px;}
+  @keyframes fadeInUp{
+    from{opacity:0;transform:translateY(8px);}
+    to{opacity:1;transform:translateY(0);}
+  }
+  .wrap > *{animation:fadeInUp .45s ease-out both;}
+  .wrap > *:nth-child(2){animation-delay:.05s;}
+  .wrap > *:nth-child(3){animation-delay:.1s;}
+  .wrap > *:nth-child(4){animation-delay:.15s;}
+  .wrap > *:nth-child(5){animation-delay:.2s;}
+
+  header{margin-bottom:24px;}
+  .brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
+  .brand h1{
+    margin:0;font-size:22px;letter-spacing:.06em;text-transform:uppercase;
+    font-weight:700;
+  }
+  .brand h1 .glyph{color:var(--accent);}
+  .tagline{color:var(--muted);margin:4px 0 14px;}
+  .status-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .badge{
+    display:inline-flex;align-items:center;gap:7px;
+    border:1px solid var(--border-2);border-radius:999px;
+    padding:5px 12px;font-size:12px;color:var(--muted);background:var(--surface);
+  }
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none;}
+  .dot.live{background:var(--accent);box-shadow:0 0 0 0 rgba(51,214,192,.6);animation:pulse 2s infinite;}
+  .dot.down{background:var(--err);}
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(51,214,192,.5);}
+    70%{box-shadow:0 0 0 6px rgba(51,214,192,0);}
+    100%{box-shadow:0 0 0 0 rgba(51,214,192,0);}
+  }
+  .identity{color:var(--muted);margin-top:8px;font-size:13px;}
+  .identity strong{color:var(--text);font-weight:600;}
+  .temp-note{color:var(--warn);margin-top:6px;font-size:13px;}
+
+  h2{
+    font-size:13px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--muted);margin:0 0 14px;
+  }
+  h2::before{content:"# ";color:var(--accent);}
+
+  .card{
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius);padding:18px 18px 20px;margin-bottom:20px;
+  }
+  .grid{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:20px;align-items:start;}
+  @media (max-width:860px){
+    .grid{grid-template-columns:1fr;}
+  }
+
+  .error-banner{
+    border:1px solid var(--err);color:var(--err);background:rgba(255,107,106,.08);
+    border-radius:var(--radius);padding:10px 12px;font-size:13px;margin-top:10px;
+    white-space:pre-wrap;word-break:break-word;
+  }
+  .muted{color:var(--muted);}
+  .loading{color:var(--muted);font-size:13px;}
+
+  /* table browser */
+  details.table-item{border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;overflow:hidden;}
+  details.table-item summary{
+    list-style:none;cursor:pointer;padding:9px 12px;display:flex;align-items:center;gap:8px;
+    background:var(--surface-2);user-select:none;
+  }
+  details.table-item summary::-webkit-details-marker{display:none;}
+  .chev{display:inline-block;transition:transform .15s ease;color:var(--muted);flex:none;}
+  details.table-item[open] .chev{transform:rotate(90deg);}
+  .tname{font-weight:600;}
+  .tbadge{
+    font-size:10px;color:var(--accent);border:1px solid var(--accent-dim);border-radius:4px;
+    padding:1px 5px;margin-left:auto;flex:none;
+  }
+  .tcount{color:var(--muted);font-size:12px;}
+  .tdesc{padding:8px 12px 0;color:var(--muted);font-size:12px;}
+  .col-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12px;}
+  .col-table th, .col-table td{
+    text-align:left;padding:5px 12px;border-top:1px solid var(--border);vertical-align:top;
+  }
+  .col-table th{color:var(--muted);font-weight:600;}
+  .col-desc{color:var(--muted);}
+
+  /* query box */
+  textarea#adql-input{
+    width:100%;min-height:110px;resize:vertical;background:var(--surface-2);
+    color:var(--text);border:1px solid var(--border-2);border-radius:var(--radius);
+    padding:10px 12px;font-family:var(--mono);font-size:13px;
+  }
+  textarea#adql-input:focus{outline:none;border-color:var(--accent);}
+  .query-controls{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap;}
+  button{
+    font-family:var(--mono);font-size:12px;border-radius:4px;cursor:pointer;
+    transition:transform .08s ease, background .15s ease, border-color .15s ease;
+  }
+  button:active{transform:scale(.96);}
+  .btn-primary{
+    background:var(--accent);color:#04211d;border:1px solid var(--accent);
+    padding:8px 16px;font-weight:700;letter-spacing:.03em;
+  }
+  .btn-primary:hover{background:#4be5cf;}
+  .btn-primary:disabled{opacity:.5;cursor:default;transform:none;}
+  .btn-ghost{
+    background:transparent;color:var(--muted);border:1px solid var(--border-2);padding:6px 10px;
+  }
+  .btn-ghost:hover{color:var(--text);border-color:var(--accent);}
+  .hint{color:var(--muted);font-size:11px;}
+  .result-wrap{margin-top:14px;overflow-x:auto;}
+  table.results{border-collapse:collapse;font-size:12px;white-space:nowrap;}
+  table.results th, table.results td{
+    padding:5px 10px;border:1px solid var(--border);text-align:left;
+  }
+  table.results th{background:var(--surface-2);color:var(--accent);position:sticky;top:0;}
+  .overflow-note{color:var(--warn);font-size:12px;margin-top:8px;}
+
+  /* snippets */
+  .snippet-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+  .snippet-tabs button{
+    background:var(--surface-2);color:var(--muted);border:1px solid var(--border);padding:6px 12px;
+  }
+  .snippet-tabs button.active{color:var(--accent);border-color:var(--accent-dim);}
+  .snippet{display:none;}
+  .snippet.active{display:block;}
+  .snippet-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+  .snippet-head .label{color:var(--muted);font-size:12px;}
+  pre.code{
+    background:#060a0e;border:1px solid var(--border);border-radius:var(--radius);
+    padding:12px 14px;overflow-x:auto;font-size:12.5px;margin:0;
+  }
+  code{white-space:pre;}
+
+  /* upload */
+  #upload-section{display:none;}
+  .dropzone{
+    border:2px dashed var(--border-2);border-radius:var(--radius);padding:28px 16px;
+    text-align:center;color:var(--muted);transition:border-color .15s ease, background .15s ease;
+  }
+  .dropzone.drag{border-color:var(--accent);background:rgba(51,214,192,.06);color:var(--text);}
+  .dropzone input{display:none;}
+  ul#upload-log{list-style:none;margin:12px 0 0;padding:0;font-size:12px;}
+  ul#upload-log li{padding:4px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:10px;}
+  ul#upload-log li .status{flex:none;color:var(--muted);}
+  ul#upload-log li .status.ok{color:var(--accent);}
+  ul#upload-log li .status.err{color:var(--err);}
+
+  footer{color:var(--muted);font-size:11px;margin-top:12px;text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <h1><span class="glyph">&#9642;</span> tapdrop</h1>
+    </div>
+    <p class="tagline">A temporary, standards-compliant TAP service &mdash; not an archive. Data disappears when this process stops.</p>
+    <div class="status-row">
+      <span class="badge" id="status-badge"><span class="dot" id="status-dot"></span><span id="status-text">checking status&hellip;</span></span>
+      <span class="badge" id="expiry-badge" style="display:none;"></span>
+    </div>
+    <p class="identity" id="identity-line">Loading table inventory&hellip;</p>
+    <p class="temp-note" id="availability-error" style="display:none;"></p>
+  </header>
+
+  <div class="grid">
+    <section class="card" id="tables-section">
+      <h2>Tables</h2>
+      <div id="tables-body"><p class="loading">Fetching /tap/tables&hellip;</p></div>
+    </section>
+
+    <section class="card" id="query-section">
+      <h2>ADQL query</h2>
+      <textarea id="adql-input" spellcheck="false" placeholder="SELECT TOP 10 * FROM ..."></textarea>
+      <div class="query-controls">
+        <button class="btn-primary" id="run-query">Run query</button>
+        <span class="hint">Ctrl/Cmd + Enter to run &middot; against /tap/sync, FORMAT=votable/td, MAXREC=500</span>
+      </div>
+      <div id="query-status"></div>
+      <div class="result-wrap" id="result-wrap"></div>
+    </section>
+  </div>
+
+  <section class="card" id="snippets-section">
+    <h2>Ready-to-paste snippets</h2>
+    <p class="loading" id="snippets-loading">Waiting for table inventory&hellip;</p>
+    <div id="snippets-body" style="display:none;">
+      <div class="snippet-tabs" id="snippet-tabs"></div>
+      <div id="snippet-panes"></div>
+    </div>
+  </section>
+
+  <section class="card" id="upload-section">
+    <h2>Upload a file</h2>
+    <div class="dropzone" id="dropzone" tabindex="0">
+      <p>Drag &amp; drop a catalog file here, or <button class="btn-ghost" id="browse-btn" type="button">browse</button></p>
+      <input type="file" id="file-input" multiple>
+    </div>
+    <ul id="upload-log"></ul>
+  </section>
+
+  <footer id="footer-line">tapdrop</footer>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- small DOM/XML helpers ---------- */
+
+function apiUrl(path) {
+  // Always resolved against the page's own location, so a /t/<token>/
+  // prefix (or none) is preserved automatically. Never hardcode a leading "/".
+  return new URL(path, window.location.href).toString();
+}
+
+function h(tag, attrs) {
+  const node = document.createElement(tag);
+  attrs = attrs || {};
+  for (const k in attrs) {
+    if (k === "class") node.className = attrs[k];
+    else if (k === "text") node.textContent = attrs[k];
+    else node.setAttribute(k, attrs[k]);
+  }
+  for (let i = 2; i < arguments.length; i++) {
+    const child = arguments[i];
+    if (child == null) continue;
+    node.appendChild(typeof child === "string" ? document.createTextNode(child) : child);
+  }
+  return node;
+}
+
+function localName(el) {
+  const t = el.tagName;
+  const i = t.indexOf(":");
+  return i === -1 ? t : t.slice(i + 1);
+}
+function child(parent, tag) {
+  if (!parent) return null;
+  for (const c of parent.children) if (localName(c) === tag) return c;
+  return null;
+}
+function children(parent, tag) {
+  if (!parent) return [];
+  const out = [];
+  for (const c of parent.children) if (localName(c) === tag) out.push(c);
+  return out;
+}
+function text(el) {
+  return el ? el.textContent.trim() : null;
+}
+
+async function fetchXml(path, init) {
+  const res = await fetch(apiUrl(path), init);
+  const body = await res.text();
+  const doc = new DOMParser().parseFromString(body, "text/xml");
+  if (doc.getElementsByTagName("parsererror").length) {
+    throw new Error("Server returned unparseable XML (HTTP " + res.status + ").");
+  }
+  return { res, doc };
+}
+
+/* ---------- availability / identity ---------- */
+
+let discoveredTables = []; // [{schema, table, qualified, description, columns:[{name,description,unit,ucd,datatype}], ra, dec}]
+
+async function loadAvailability() {
+  const dot = document.getElementById("status-dot");
+  const statusText = document.getElementById("status-text");
+  const expiryBadge = document.getElementById("expiry-badge");
+  const errLine = document.getElementById("availability-error");
+  try {
+    const { doc } = await fetchXml("tap/availability");
+    const root = doc.documentElement;
+    const available = text(child(root, "available")) === "true";
+    const downAt = text(child(root, "downAt"));
+
+    dot.className = "dot " + (available ? "live" : "down");
+    statusText.textContent = available ? "live" : "stopped serving";
+
+    if (downAt) {
+      expiryBadge.style.display = "inline-flex";
+      startCountdown(expiryBadge, downAt);
+    } else {
+      expiryBadge.style.display = "none";
+    }
+  } catch (err) {
+    dot.className = "dot down";
+    statusText.textContent = "status unknown";
+    errLine.style.display = "block";
+    errLine.textContent = "Could not reach /tap/availability: " + err.message;
+  }
+}
+
+let countdownTimer = null;
+function startCountdown(badgeEl, isoDownAt) {
+  const target = new Date(isoDownAt).getTime();
+  if (Number.isNaN(target)) {
+    badgeEl.textContent = "expires: " + isoDownAt;
+    return;
+  }
+  if (countdownTimer) clearInterval(countdownTimer);
+  function tick() {
+    const remainMs = target - Date.now();
+    if (remainMs <= 0) {
+      badgeEl.textContent = "expired";
+      clearInterval(countdownTimer);
+      return;
+    }
+    badgeEl.textContent = "expires in " + formatDuration(remainMs) + " (" + isoDownAt + ")";
+  }
+  tick();
+  countdownTimer = setInterval(tick, 1000);
+}
+function formatDuration(ms) {
+  let s = Math.floor(ms / 1000);
+  const days = Math.floor(s / 86400); s -= days * 86400;
+  const hours = Math.floor(s / 3600); s -= hours * 3600;
+  const mins = Math.floor(s / 60); s -= mins * 60;
+  const parts = [];
+  if (days) parts.push(days + "d");
+  if (hours || days) parts.push(hours + "h");
+  parts.push(mins + "m");
+  if (!days && !hours) parts.push(s + "s");
+  return parts.join(" ");
+}
+
+/* ---------- tables ---------- */
+
+const RA_UCD = "pos.eq.ra;meta.main";
+const DEC_UCD = "pos.eq.dec;meta.main";
+
+async function loadTables() {
+  const body = document.getElementById("tables-body");
+  const identity = document.getElementById("identity-line");
+  try {
+    const { doc } = await fetchXml("tap/tables");
+    const root = doc.documentElement;
+    const schemas = children(root, "schema");
+    discoveredTables = [];
+    body.textContent = "";
+
+    let tableCount = 0;
+    for (const schemaEl of schemas) {
+      const schemaName = text(child(schemaEl, "name")) || "(unnamed)";
+      const tableEls = children(schemaEl, "table");
+      for (const tableEl of tableEls) {
+        tableCount++;
+        const qualified = text(child(tableEl, "name")) || (schemaName + ".?");
+        const description = text(child(tableEl, "description"));
+        const columnEls = children(tableEl, "column");
+        const columns = columnEls.map((colEl) => ({
+          name: text(child(colEl, "name")) || "",
+          description: text(child(colEl, "description")),
+          unit: text(child(colEl, "unit")),
+          ucd: text(child(colEl, "ucd")),
+          datatype: text(child(colEl, "dataType")),
+        }));
+        const ra = columns.find((c) => (c.ucd || "").toLowerCase() === RA_UCD);
+        const dec = columns.find((c) => (c.ucd || "").toLowerCase() === DEC_UCD);
+        const entry = { schema: schemaName, qualified, description, columns, ra, dec };
+        discoveredTables.push(entry);
+        body.appendChild(renderTableItem(entry));
+      }
+    }
+
+    if (tableCount === 0) {
+      body.appendChild(h("p", { class: "muted" }, "No tables were discovered."));
+    }
+    identity.textContent = "";
+    identity.appendChild(document.createTextNode("Serving "));
+    identity.appendChild(h("strong", { text: String(tableCount) }));
+    identity.appendChild(document.createTextNode(" table" + (tableCount === 1 ? "" : "s") + " across " + schemas.length + " schema" + (schemas.length === 1 ? "" : "s") + "."));
+
+    populateDefaultQuery();
+    buildSnippets();
+  } catch (err) {
+    body.textContent = "";
+    body.appendChild(h("div", { class: "error-banner" }, "Could not load /tap/tables: " + err.message));
+    identity.textContent = "Table inventory unavailable.";
+    document.getElementById("snippets-loading").textContent =
+      "Snippets unavailable: table inventory could not be loaded.";
+  }
+}
+
+function renderTableItem(entry) {
+  const details = h("details", { class: "table-item" });
+  const summary = h(
+    "summary",
+    {},
+    h("span", { class: "chev" }, "▸"),
+    h("span", { class: "tname", text: entry.qualified }),
+    h("span", { class: "tcount", text: entry.columns.length + " col" + (entry.columns.length === 1 ? "" : "s") })
+  );
+  if (entry.ra && entry.dec) {
+    summary.appendChild(h("span", { class: "tbadge", text: "RA/DEC" }));
+  }
+  details.appendChild(summary);
+
+  if (entry.description) {
+    details.appendChild(h("p", { class: "tdesc", text: entry.description }));
+  }
+
+  const table = h("table", { class: "col-table" });
+  const thead = h(
+    "thead",
+    {},
+    h(
+      "tr",
+      {},
+      h("th", { text: "column" }),
+      h("th", { text: "unit" }),
+      h("th", { text: "ucd" }),
+      h("th", { text: "description" })
+    )
+  );
+  const tbody = h("tbody");
+  for (const col of entry.columns) {
+    tbody.appendChild(
+      h(
+        "tr",
+        {},
+        h("td", { text: col.name }),
+        h("td", { text: col.unit || "" }),
+        h("td", { text: col.ucd || "" }),
+        h("td", { class: "col-desc", text: col.description || "" })
+      )
+    );
+  }
+  table.appendChild(thead);
+  table.appendChild(tbody);
+
+  const wrap = h("div", { style: "padding:0 12px 12px;" }, table);
+  details.appendChild(wrap);
+  return details;
+}
+
+function firstPositionalTable() {
+  return discoveredTables.find((t) => t.ra && t.dec) || null;
+}
+
+function buildQueryFor(entry) {
+  if (!entry) return null;
+  if (entry.ra && entry.dec) {
+    return (
+      "SELECT TOP 10 * FROM " + entry.qualified + "\n" +
+      "WHERE 1=CONTAINS(POINT('ICRS', " + entry.ra.name + ", " + entry.dec.name + "),\n" +
+      "                 CIRCLE('ICRS', 10.68, 41.27, 0.5))"
+    );
+  }
+  return "SELECT TOP 10 * FROM " + entry.qualified;
+}
+
+function populateDefaultQuery() {
+  const input = document.getElementById("adql-input");
+  if (input.value.trim()) return; // do not clobber something the user already typed
+  const entry = firstPositionalTable() || discoveredTables[0] || null;
+  const query = buildQueryFor(entry);
+  if (query) input.value = query;
+}
+
+/* ---------- ADQL query box ---------- */
+
+async function runQuery() {
+  const input = document.getElementById("adql-input");
+  const runBtn = document.getElementById("run-query");
+  const statusEl = document.getElementById("query-status");
+  const resultWrap = document.getElementById("result-wrap");
+  const query = input.value.trim();
+
+  statusEl.textContent = "";
+  resultWrap.textContent = "";
+  if (!query) {
+    statusEl.appendChild(h("div", { class: "error-banner" }, "Enter an ADQL query first."));
+    return;
+  }
+
+  runBtn.disabled = true;
+  statusEl.appendChild(h("p", { class: "loading" }, "Running query against /tap/sync…"));
+
+  try {
+    const params = new URLSearchParams({
+      REQUEST: "doQuery",
+      LANG: "ADQL",
+      FORMAT: "votable/td",
+      MAXREC: "500",
+      QUERY: query,
+    });
+    const res = await fetch(apiUrl("tap/sync") + "?" + params.toString());
+    const bodyText = await res.text();
+    const doc = new DOMParser().parseFromString(bodyText, "text/xml");
+    statusEl.textContent = "";
+
+    if (doc.getElementsByTagName("parsererror").length) {
+      statusEl.appendChild(
+        h("div", { class: "error-banner" }, "Unexpected response (HTTP " + res.status + "), not valid XML.")
+      );
+      return;
+    }
+
+    const root = doc.documentElement; // VOTABLE
+    const resource = child(root, "RESOURCE");
+    const infos = children(resource, "INFO");
+    const statusInfo = infos.find((i) => i.getAttribute("name") === "QUERY_STATUS");
+
+    if (statusInfo && statusInfo.getAttribute("value") === "ERROR") {
+      statusEl.appendChild(h("div", { class: "error-banner" }, text(statusInfo) || "Query failed."));
+      return;
+    }
+
+    const table = child(resource, "TABLE");
+    if (!table) {
+      statusEl.appendChild(h("div", { class: "error-banner" }, "No result table in response."));
+      return;
+    }
+    const fields = children(table, "FIELD");
+    const dataEl = child(table, "DATA");
+    const tabledata = dataEl ? child(dataEl, "TABLEDATA") : null;
+    const rows = tabledata ? children(tabledata, "TR") : [];
+
+    const resultTable = h("table", { class: "results" });
+    const thead = h("thead");
+    const headRow = h("tr");
+    for (const f of fields) headRow.appendChild(h("th", { text: f.getAttribute("name") || "" }));
+    thead.appendChild(headRow);
+    const tbody = h("tbody");
+    for (const tr of rows) {
+      const rowEl = h("tr");
+      for (const td of children(tr, "TD")) rowEl.appendChild(h("td", { text: td.textContent }));
+      tbody.appendChild(rowEl);
+    }
+    resultTable.appendChild(thead);
+    resultTable.appendChild(tbody);
+    resultWrap.appendChild(resultTable);
+
+    statusEl.appendChild(h("p", { class: "hint" }, rows.length + " row" + (rows.length === 1 ? "" : "s") + " returned."));
+
+    const overflow = infos.find((i) => i.getAttribute("value") === "OVERFLOW");
+    if (overflow) {
+      statusEl.appendChild(h("p", { class: "overflow-note" }, "Result truncated at MAXREC."));
+    }
+  } catch (err) {
+    statusEl.textContent = "";
+    statusEl.appendChild(h("div", { class: "error-banner" }, "Request failed: " + err.message));
+  } finally {
+    runBtn.disabled = false;
+  }
+}
+
+/* ---------- snippets ---------- */
+
+function buildSnippets() {
+  const loadingEl = document.getElementById("snippets-loading");
+  const bodyEl = document.getElementById("snippets-body");
+  const tabsEl = document.getElementById("snippet-tabs");
+  const panesEl = document.getElementById("snippet-panes");
+
+  const entry = firstPositionalTable() || discoveredTables[0] || null;
+  const query = buildQueryFor(entry);
+  if (!query) {
+    loadingEl.textContent = "No tables were discovered, so there is nothing to query yet.";
+    return;
+  }
+
+  const tapBase = apiUrl("tap");
+  const oneLineQuery = query.replace(/\s+/g, " ").trim();
+
+  const items = [
+    { id: "curl-sync", label: "curl (sync)", text: curlSyncSnippet(tapBase, oneLineQuery) },
+    { id: "curl-async", label: "curl (async)", text: curlAsyncSnippet(tapBase, oneLineQuery) },
+    { id: "pyvo", label: "pyvo", text: pyvoSnippet(tapBase, oneLineQuery) },
+    { id: "astroquery", label: "astroquery", text: astroquerySnippet(tapBase, oneLineQuery) },
+    { id: "topcat", label: "TOPCAT", text: topcatSnippet(tapBase) },
+  ];
+
+  tabsEl.textContent = "";
+  panesEl.textContent = "";
+  items.forEach((item, idx) => {
+    const tabBtn = h("button", { type: "button", text: item.label, class: idx === 0 ? "active" : "" });
+    tabBtn.dataset.target = item.id;
+    tabBtn.addEventListener("click", () => selectSnippet(item.id));
+    tabsEl.appendChild(tabBtn);
+
+    const pre = h("pre", { class: "code" }, h("code", { text: item.text }));
+    const copyBtn = h("button", { class: "btn-ghost", type: "button", text: "copy" });
+    copyBtn.addEventListener("click", () => copyToClipboard(item.text, copyBtn));
+    const pane = h(
+      "div",
+      { class: "snippet" + (idx === 0 ? " active" : ""), id: "pane-" + item.id },
+      h("div", { class: "snippet-head" }, h("span", { class: "label", text: item.label }), copyBtn),
+      pre
+    );
+    panesEl.appendChild(pane);
+  });
+
+  loadingEl.style.display = "none";
+  bodyEl.style.display = "block";
+}
+
+function selectSnippet(id) {
+  document.querySelectorAll("#snippet-tabs button").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.target === id);
+  });
+  document.querySelectorAll(".snippet").forEach((pane) => {
+    pane.classList.toggle("active", pane.id === "pane-" + id);
+  });
+}
+
+function curlSyncSnippet(tapBase, query) {
+  return (
+    'curl -G "' + tapBase + '/sync" \\\n' +
+    '  --data-urlencode "REQUEST=doQuery" \\\n' +
+    '  --data-urlencode "LANG=ADQL" \\\n' +
+    '  --data-urlencode "FORMAT=csv" \\\n' +
+    '  --data-urlencode "QUERY=' + query + '"'
+  );
+}
+function curlAsyncSnippet(tapBase, query) {
+  return (
+    "JOB=$(curl -s -o /dev/null -w '%{redirect_url}' \"" + tapBase + '/async" \\\n' +
+    '  --data-urlencode "REQUEST=doQuery" \\\n' +
+    '  --data-urlencode "LANG=ADQL" \\\n' +
+    '  --data-urlencode "PHASE=RUN" \\\n' +
+    '  --data-urlencode "QUERY=' + query + '")\n' +
+    'curl -s "$JOB/phase"\n' +
+    'curl -s "$JOB/results/result" -o result.vot'
+  );
+}
+function pyvoSnippet(tapBase, query) {
+  return (
+    "import pyvo\n" +
+    'svc = pyvo.dal.TAPService("' + tapBase + '")\n' +
+    'svc.run_sync("' + query + '").to_table()'
+  );
+}
+function astroquerySnippet(tapBase, query) {
+  return (
+    "from astroquery.utils.tap.core import TapPlus\n" +
+    'tap = TapPlus(url="' + tapBase + '")\n' +
+    'job = tap.launch_job("' + query + '")\n' +
+    "job.get_results()"
+  );
+}
+function topcatSnippet(tapBase) {
+  return (
+    "VO -> Table Access Protocol (TAP) Query\n" +
+    "TAP URL: " + tapBase + "\n" +
+    "Then: Query tab -> paste the ADQL -> Run Query"
+  );
+}
+
+async function copyToClipboard(text, btn) {
+  const original = btn.textContent;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    btn.textContent = "copied";
+  } catch (err) {
+    btn.textContent = "copy failed";
+  } finally {
+    setTimeout(() => { btn.textContent = original; }, 1200);
+  }
+}
+
+/* ---------- upload (shown only when the capabilities document advertises it) ---------- */
+
+async function maybeShowUpload() {
+  try {
+    const { doc } = await fetchXml("tap/capabilities");
+    const uploadMethods = doc.getElementsByTagName("uploadMethod");
+    if (uploadMethods.length > 0) {
+      document.getElementById("upload-section").style.display = "block";
+      wireUpload();
+    }
+  } catch (err) {
+    // Upload is an optional, opt-in feature; if capabilities cannot be read,
+    // fail closed (no upload box) rather than guessing.
+  }
+}
+
+function wireUpload() {
+  const dropzone = document.getElementById("dropzone");
+  const fileInput = document.getElementById("file-input");
+  const browseBtn = document.getElementById("browse-btn");
+  const log = document.getElementById("upload-log");
+
+  browseBtn.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", () => uploadFiles(fileInput.files));
+
+  ["dragenter", "dragover"].forEach((evt) =>
+    dropzone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropzone.classList.add("drag");
+    })
+  );
+  ["dragleave", "drop"].forEach((evt) =>
+    dropzone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropzone.classList.remove("drag");
+    })
+  );
+  dropzone.addEventListener("drop", (e) => {
+    if (e.dataTransfer && e.dataTransfer.files) uploadFiles(e.dataTransfer.files);
+  });
+
+  function uploadFiles(fileList) {
+    for (const file of fileList) uploadOne(file);
+  }
+
+  function uploadOne(file) {
+    const item = h(
+      "li",
+      {},
+      h("span", { text: file.name }),
+      h("span", { class: "status", text: "uploading…" })
+    );
+    log.appendChild(item);
+    const statusSpan = item.querySelector(".status");
+
+    const formData = new FormData();
+    formData.append("file", file, file.name);
+
+    fetch(apiUrl("upload"), { method: "POST", body: formData })
+      .then((res) => {
+        if (res.ok) {
+          statusSpan.textContent = "uploaded";
+          statusSpan.classList.add("ok");
+        } else {
+          return res.text().then((body) => {
+            statusSpan.textContent = "failed (HTTP " + res.status + ")";
+            statusSpan.classList.add("err");
+            statusSpan.title = body.slice(0, 300);
+          });
+        }
+      })
+      .catch((err) => {
+        statusSpan.textContent = "failed: " + err.message;
+        statusSpan.classList.add("err");
+      });
+  }
+}
+
+/* ---------- wiring ---------- */
+
+document.getElementById("run-query").addEventListener("click", runQuery);
+document.getElementById("adql-input").addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+    e.preventDefault();
+    runQuery();
+  }
+});
+document.getElementById("footer-line").textContent = "tapdrop — " + apiUrl("");
+
+loadAvailability();
+loadTables();
+maybeShowUpload();
+</script>
+</body>
+</html>

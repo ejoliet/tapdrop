@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Not an IVOA schema. VOSICapabilities alone does not know the concrete
+     types (vod:ParamHTTP, tr:TableAccess) that a capabilities document names
+     in xsi:type, so validation needs all three compiled together. -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:import namespace="http://www.ivoa.net/xml/VOSICapabilities/v1.0"
+             schemaLocation="VOSICapabilities-v1.0.xsd"/>
+  <xs:import namespace="http://www.ivoa.net/xml/VODataService/v1.1"
+             schemaLocation="VODataService-v1.1.xsd"/>
+  <xs:import namespace="http://www.ivoa.net/xml/TAPRegExt/v1.0"
+             schemaLocation="TAPRegExt-v1.0.xsd"/>
+</xs:schema>

@@ -1,0 +1,12 @@
+# %ECSV 1.0
+# ---
+# datatype:
+# - {name: id, datatype: int64}
+# - {name: ra, unit: deg, datatype: float64, description: Right ascension}
+# - {name: dec, unit: deg, datatype: float64, description: Declination}
+# - {name: teff, unit: K, datatype: float64, description: Effective temperature}
+# schema: astropy-2.0
+id ra dec teff
+1 10.5 -30.0 5000.0
+2 200.2 0.0 6000.0
+3 300.9 60.0 7000.0

@@ -1,0 +1,8 @@
+description: Star cluster catalog
+columns:
+  ra_icrs:
+    unit: deg
+    description: ICRS right ascension
+  dec_icrs:
+    unit: deg
+    description: ICRS declination

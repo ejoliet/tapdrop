@@ -1,0 +1,23 @@
+# v1.1 fallback profile for a plain FITS image: standard WCS keywords and
+# header cards only, no mission-specific metadata. RDD.md M7 deliverable.
+# roman-wfi (M8) is a separate profile file and is not affected by this one.
+name: generic-fits-wcs
+description: >-
+  Generic FITS image described only by standard WCS and header keywords.
+  Used for any image that does not match a mission-specific profile.
+dataproduct_type: image
+calib_level: 2
+obs_collection: UNKNOWN
+
+# em_min/em_max (meters) by FILTER header value, upper-cased on lookup.
+# Broadband Johnson-Cousins-ish ranges; approximate on purpose - a real
+# mission profile (e.g. roman-wfi, M8) replaces this with its own optical
+# elements.
+bands:
+  U: {min: 3.0e-7, max: 4.0e-7}
+  B: {min: 4.0e-7, max: 5.0e-7}
+  V: {min: 5.0e-7, max: 6.0e-7}
+  R: {min: 6.0e-7, max: 7.0e-7}
+  I: {min: 7.0e-7, max: 8.5e-7}
+  G: {min: 4.0e-7, max: 7.0e-7}
+  HA: {min: 6.5e-7, max: 6.6e-7}
