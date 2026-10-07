@@ -65,6 +65,14 @@ table = result.to_table()
 *VO → Table Access Protocol (TAP) Query*, then set the TAP URL to
 `http://127.0.0.1:8000/tap` and load.
 
+### Firefly
+
+Firefly fetches TAP data from its own server, not the browser, so the URL
+must be reachable from wherever Firefly runs. Firefly in Docker on the same
+machine: `http://host.docker.internal:8000/tap` (inside the container,
+`127.0.0.1` is the container). A hosted Firefly cannot reach your laptop;
+use `--share` and give it the tunnel URL.
+
 ### curl
 
 ```bash
@@ -189,7 +197,9 @@ With `--allow-upload`, two upload paths are enabled:
   client.
 - TAP UPLOAD: a client sends a VOTable alongside a query
   (`UPLOAD=name,param:x`) and joins against it as `tap_upload.name` for the
-  duration of that one sync query.
+  duration of that one sync query. Async jobs do not carry uploads yet, so
+  a client that uploads through `/tap/async` (TOPCAT's default, pyvo
+  `submit_job`) gets `Unknown table 'tap_upload.…'`; use sync mode for now.
 
 Both are capped by `TAPDROP_UPLOAD_MAX_MB` (default 200); there is no CLI
 flag for it.
@@ -236,6 +246,15 @@ Every CLI flag has a matching `TAPDROP_<FLAG>` environment variable.
   `COPY`, `ATTACH`, `INSTALL`, `read_*` table functions, and file paths
   inside queries.
 - The `--token` secret is never logged; the query log stores a hash of it.
+
+## Known issues
+
+- `stilts taplint` still reports errors: async UPLOAD (above), TAP_SCHEMA's
+  `size` column and standard foreign keys, HATS `_healpix_29` not delimited,
+  two UWS POST forms, async job creation answering 400 instead of 303, and
+  the examples endpoint not declared. Tracked as milestone M6.1 in `RDD.md`.
+- `--result-store s3://` is not implemented; async results need local disk.
+- Roman ASDF discovery (M8) is not built.
 
 ## More
 

@@ -293,7 +293,6 @@ async function fetchXml(path, init) {
 
 /* ---------- availability / identity ---------- */
 
-let discoveredTables = []; // [{schema, table, qualified, description, columns:[{name,description,unit,ucd,datatype}], ra, dec}]
 
 async function loadAvailability() {
   const dot = document.getElementById("status-dot");
@@ -368,7 +367,6 @@ async function loadTables() {
     const { doc } = await fetchXml("tap/tables");
     const root = doc.documentElement;
     const schemas = children(root, "schema");
-    discoveredTables = [];
     body.textContent = "";
 
     let tableCount = 0;
@@ -390,7 +388,6 @@ async function loadTables() {
         const ra = columns.find((c) => (c.ucd || "").toLowerCase() === RA_UCD);
         const dec = columns.find((c) => (c.ucd || "").toLowerCase() === DEC_UCD);
         const entry = { schema: schemaName, qualified, description, columns, ra, dec };
-        discoveredTables.push(entry);
         body.appendChild(renderTableItem(entry));
       }
     }
@@ -466,27 +463,22 @@ function renderTableItem(entry) {
   return details;
 }
 
-function firstPositionalTable() {
-  return discoveredTables.find((t) => t.ra && t.dec) || null;
-}
-
-function buildQueryFor(entry) {
-  if (!entry) return null;
-  if (entry.ra && entry.dec) {
-    return (
-      "SELECT TOP 10 * FROM " + entry.qualified + "\n" +
-      "WHERE 1=CONTAINS(POINT('ICRS', " + entry.ra.name + ", " + entry.dec.name + "),\n" +
-      "                 CIRCLE('ICRS', 10.68, 41.27, 0.5))"
-    );
+// The server builds the examples from real rows (a cone centered on data),
+// so the UI reuses the first one rather than guessing a sky position.
+async function exampleQuery() {
+  try {
+    const res = await fetch(apiUrl("tap/examples"));
+    const doc = new DOMParser().parseFromString(await res.text(), "text/html");
+    return text(doc.querySelector("pre[property=query]"));
+  } catch (err) {
+    return null;
   }
-  return "SELECT TOP 10 * FROM " + entry.qualified;
 }
 
-function populateDefaultQuery() {
+async function populateDefaultQuery() {
   const input = document.getElementById("adql-input");
+  const query = await exampleQuery();
   if (input.value.trim()) return; // do not clobber something the user already typed
-  const entry = firstPositionalTable() || discoveredTables[0] || null;
-  const query = buildQueryFor(entry);
   if (query) input.value = query;
 }
 
@@ -580,14 +572,13 @@ async function runQuery() {
 
 /* ---------- snippets ---------- */
 
-function buildSnippets() {
+async function buildSnippets() {
   const loadingEl = document.getElementById("snippets-loading");
   const bodyEl = document.getElementById("snippets-body");
   const tabsEl = document.getElementById("snippet-tabs");
   const panesEl = document.getElementById("snippet-panes");
 
-  const entry = firstPositionalTable() || discoveredTables[0] || null;
-  const query = buildQueryFor(entry);
+  const query = await exampleQuery();
   if (!query) {
     loadingEl.textContent = "No tables were discovered, so there is nothing to query yet.";
     return;

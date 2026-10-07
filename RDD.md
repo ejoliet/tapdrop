@@ -475,6 +475,32 @@ stilts taplint tapurl=http://localhost:8000/tap
 git tag v1.0.0 && git push --tags     # then push image to ghcr.io/ejoliet/tapdrop
 ```
 
+#### M6.1 — taplint clean, async UPLOAD
+
+Status: open. `stilts taplint` against the 2026-10-06 build (Gaia HATS shards, `--allow-upload`) reports 23 errors, 0 warnings, 2 failures. This milestone clears the errors so the v1.0 acceptance box can be ticked.
+
+| Agent deliverable | taplint code | Done when |
+|---|---|---|
+| **Async UPLOAD**: `/tap/async` keeps the `UPLOAD` parameter and its multipart parts on the job and attaches `tap_upload.*` when the job runs (today only `/tap/sync` does; an async job fails with `Unknown table 'tap_upload.t1'`). pyvo and TOPCAT upload through async | `E-UPL-QERR` ×2 | Async UPLOAD cross-match test; pyvo `submit_job(..., uploads=...)` live test |
+| `TAP_SCHEMA.columns."size"` (int), the TAP 1.1 §4.3 name for `arraysize` | `E-TMS-TSC0`, `E-TMS-CRSV`, `E-TME-CRSV` | Column present in TAP_SCHEMA and `/tap/tables` |
+| Standard TAP_SCHEMA foreign keys in `TAP_SCHEMA.keys` / `key_columns`: tables→schemas, columns→tables, keys→tables (from, target), key_columns→keys | `E-TMS-TSLN` ×5 | The 5 keys are queryable |
+| Column names that are not ADQL regular identifiers (HATS `_healpix_29`) published delimited (`"_healpix_29"`) in TAP_SCHEMA and VOSI tables, and accepted delimited by the translator | `E-TMS-CNID`, `E-TME-CNID` | Query on `"_healpix_29"` round-trips; see Open Questions |
+| UWS 1.1 §2.2.3: `POST ACTION=DELETE` on the job URL; `POST` to `/parameters` while `PENDING` | `E-UWS-PORE` ×2 | UWS tests for both |
+| Async job creation always answers 303; a bad `LANG`/`QUERY` ends the job in `ERROR` instead of a 400 at creation | `E-QAS-JREJ` | UWS test: bad LANG → 303, phase `ERROR`, `/error` explains |
+| `/tap/examples` declared in capabilities (`ivo://ivoa.net/std/DALI#examples`) and RDFa `vocab="http://www.ivoa.net/rdf/examples#"` on the document | `E-EXA-EXDH`, `E-EXA-NOVO` | Capabilities XSD-valid; examples parsed by taplint |
+
+Not errors, no action: `F-LOC-NOTP` (`ivoa.obsplan` is optional); `F-UPL-NOUP` only appears without `--allow-upload`.
+
+Fixed in the same pass that found these (no longer reported): TOPCAT `REQUEST` required (TAP 1.1 dropped it); VOTable 500 on `int8`/unsigned columns; cone examples centered on a fixed position that missed the data.
+
+Emmanuel:
+```bash
+tapdrop serve ~/Downloads/parquet/gaia/ --allow-upload &
+stilts taplint tapurl=http://localhost:8000/tap            # expect Errors: 0
+# TOPCAT: TAP Query → upload a local table and join it (async mode)
+# Firefly in Docker: service URL http://host.docker.internal:8000/tap
+```
+
 **v1.0 acceptance**
 - [ ] `stilts taplint` reports no errors (warnings triaged in `CHANGELOG.md`)
 - [ ] pyvo sync, async, and UPLOAD work; TOPCAT browses tables and runs examples
@@ -497,6 +523,8 @@ tapdrop scan ./some_fits_images/ && cat tapdrop.discovered.yaml
 ```
 
 #### M8 — Roman ASDF discovery
+
+Status: not started (`discovery/image_asdf.py` does not exist). Blocked on the Roman Open Question: real L2/L3 sample files and the target `roman_datamodels` version.
 
 | Agent deliverable | Done when |
 |---|---|
@@ -582,10 +610,16 @@ git tag v1.1.0 && git push --tags
 - [ ] SPHEREx profile in v1.1, or wait for real products?
 - [ ] Preview stretch for Roman L2 (asinh default vs zscale)?
 - [ ] Performance target for a remote HATS cone search (seconds at 0.2° on Gaia DR3), to be set after M4 measurement.
+- [ ] Non-ADQL column names such as HATS `_healpix_29` (before M6.1): publish them delimited (`"_healpix_29"`, what taplint asks for) or hide HATS bookkeeping columns from TAP_SCHEMA?
+- [ ] Confirm the defaults the M0 build chose for the first three questions (MIT; schema = parent folder name, `data` fallback; cloudflared only). Logged as DEVIATIONs in `implementation-notes.md`; tick the boxes above once accepted.
+- [ ] S3 result store (`--result-store s3://`, currently `NotImplementedError`): needed before v1.0 for Cloud Run / HF Spaces async, or move to v2?
 
 ## Next Steps
 
-1. Answer the Open Questions marked for v1 (license, default schema, tunnel choice).
-2. Create `ejoliet/tapdrop` and hand this README to the coding agent for M0–M2.
-3. Run the M2 and M3 Emmanuel checks, especially `stilts taplint`.
-4. Collect 2–3 Roman L2/L3 sample files before starting M8.
+M0–M7 and M9–M11 are implemented; M8 is not. Current order:
+
+1. **M6.1** — async UPLOAD first (real clients break on it), then the small TAP_SCHEMA, UWS, and examples fixes, until `taplint` reports 0 errors. Decide the `_healpix_29` question before starting.
+2. Tick the **v1.0 acceptance** list (TOPCAT, pyvo, `uvx` on clean macOS/Linux, S3 sources, token/TTL/share), then tag `v1.0.0`.
+3. Decide the S3 result store question (v1.0 or v2).
+4. Collect 2–3 Roman L2/L3 sample files and the `roman_datamodels` version, then **M8**.
+5. Run the M9–M11 Emmanuel checks on real images (ObsCore `taplint`, SIA/DataLink from pyvo and TOPCAT, SODA cutout in DS9), then tick the **v1.1 acceptance** list.

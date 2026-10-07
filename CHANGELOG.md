@@ -221,6 +221,19 @@ All notable changes to tapdrop are recorded here. The format follows
 
 ### Fixed
 
+- `REQUEST` is optional on `/tap/sync` and `/tap/async`, as TAP 1.1 §2.3
+  dropped it. TOPCAT omits it for a 1.1 service and got `Invalid REQUEST:
+  required, must be doQuery`. A `REQUEST` other than `doQuery` is still rejected.
+- VOTable output no longer fails with `Internal server error.` on `int8`,
+  `uint16`, `uint32` or `uint64` columns (Gaia Parquet has `int8`): astropy has
+  no VOTable type for them, so they widen to the next signed type. TAP_SCHEMA
+  declared unsigned 16/32-bit columns one size too small; they now read `int`
+  and `long`.
+- `/tap/examples` (which TOPCAT lists as service examples) and the web UI's
+  default query centered every cone on a fixed position (10.68, 41.27) and
+  returned no rows from a catalog elsewhere on the sky. The cone is now
+  centered on the table's first row with a position; a table without one gets
+  a first-rows example instead.
 - UWS timestamps are written as DALI 1.1 §3.3.3 UTC instants (`...Z`, whole
   seconds) instead of `datetime.isoformat()`, which `pyvo` refuses to parse.
 - The `--token` secret no longer reaches uvicorn's access log. `configure_logging`

@@ -47,9 +47,9 @@ _DUCKDB_TYPE_MAP = {
     "TINYINT": "short",
     "SMALLINT": "short",
     "UTINYINT": "short",
-    "USMALLINT": "short",
+    "USMALLINT": "int",
     "INTEGER": "int",
-    "UINTEGER": "int",
+    "UINTEGER": "long",
     "BIGINT": "long",
     "UBIGINT": "long",
     "HUGEINT": "long",
@@ -92,9 +92,11 @@ def numpy_dtype_to_tap(dtype: np.dtype) -> str:
     if kind == "b":
         return "boolean"
     if kind in ("i", "u"):
-        if dtype.itemsize <= 2:
+        # Unsigned needs the next signed size up: VOTable integers are signed.
+        size = dtype.itemsize * 2 if kind == "u" else dtype.itemsize
+        if size <= 2:
             return "short"
-        return "int" if dtype.itemsize <= 4 else "long"
+        return "int" if size <= 4 else "long"
     if kind == "f":
         return "float" if dtype.itemsize <= 4 else "double"
     return "char"

@@ -262,6 +262,19 @@ def _to_astropy(table: pa.Table) -> Table:
     return Table([_to_column(name, table[name]) for name in table.column_names])
 
 
+#: VOTable has no signed byte and only one unsigned type (unsignedByte), so
+#: astropy refuses these; Gaia Parquet carries int8. Each widens to the next
+#: signed type, matching the TAP_SCHEMA datatype discovery declares.
+#: ponytail: uint64 above 2**63-1 fails the cast; VOTable has no type for it.
+_VOTABLE_INT_WIDENING = {
+    pa.int8(): pa.int16(),
+    pa.uint8(): pa.int16(),
+    pa.uint16(): pa.int32(),
+    pa.uint32(): pa.int64(),
+    pa.uint64(): pa.int64(),
+}
+
+
 def _to_column(name: str, chunked: pa.ChunkedArray) -> Column:
     array = chunked.combine_chunks()
     mask = np.asarray(array.is_null()) if array.null_count else None
@@ -276,6 +289,7 @@ def _to_column(name: str, chunked: pa.ChunkedArray) -> Column:
         values = _as_str_array([v.hex() if v is not None else "" for v in array.to_pylist()])
         mask = None
     else:
+        array = array.cast(_VOTABLE_INT_WIDENING.get(array.type, array.type))
         filled = array.fill_null(False) if pa.types.is_boolean(array.type) else array.fill_null(0)
         values = filled.to_numpy(zero_copy_only=False)
 
@@ -324,7 +338,7 @@ def _votable_datatype(arrow_type: pa.DataType) -> str:
     """VOTable datatype name for an Arrow type, used by the JSON metadata block."""
     if pa.types.is_boolean(arrow_type):
         return "boolean"
-    if pa.types.is_int16(arrow_type) or pa.types.is_uint8(arrow_type):
+    if arrow_type in (pa.int8(), pa.int16(), pa.uint8()):
         return "short"
     if pa.types.is_int32(arrow_type) or pa.types.is_uint16(arrow_type):
         return "int"

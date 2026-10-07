@@ -41,7 +41,14 @@ def test_sql_lang_is_rejected() -> None:
         parse_tap_request(base(LANG="SQL"))
 
 
-@pytest.mark.parametrize("missing", ["REQUEST", "LANG", "QUERY"])
+def test_request_is_optional() -> None:
+    params = base()
+    del params["REQUEST"]
+
+    assert parse_tap_request(params).query == "SELECT 1"
+
+
+@pytest.mark.parametrize("missing", ["LANG", "QUERY"])
 def test_required_parameters(missing: str) -> None:
     params = base()
     del params[missing]

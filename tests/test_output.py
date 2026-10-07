@@ -147,6 +147,24 @@ def test_votable_keeps_integer_and_boolean_datatypes(result: pa.Table) -> None:
     assert fields["obs_time"].xtype == "timestamp"
 
 
+def test_votable_widens_integers_it_cannot_represent() -> None:
+    # Gaia Parquet has int8 columns; astropy has no VOTable type for them.
+    table = pa.table(
+        {
+            "i8": pa.array([-3, None], pa.int8()),
+            "u16": pa.array([65535, 1], pa.uint16()),
+            "u32": pa.array([4294967295, 1], pa.uint32()),
+        }
+    )
+    parsed = read_votable(serialize(table, VOTABLE)).get_first_table()
+    fields = {f.name: f.datatype for f in parsed.fields}
+
+    assert fields == {"i8": "short", "u16": "int", "u32": "long"}
+    assert parsed.array["i8"][0] == -3
+    assert parsed.array["i8"].mask[1]
+    assert parsed.array["u16"][0] == 65535
+
+
 def test_votable_carries_unit_ucd_and_description(
     result: pa.Table, columns: dict[str, FakeColumnMeta]
 ) -> None:

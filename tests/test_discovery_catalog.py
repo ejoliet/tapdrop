@@ -61,6 +61,7 @@ def test_duckdb_type_to_tap_covers_common_types() -> None:
 def test_numpy_dtype_to_tap() -> None:
     assert catalog.numpy_dtype_to_tap(np.dtype("bool")) == "boolean"
     assert catalog.numpy_dtype_to_tap(np.dtype("int16")) == "short"
+    assert catalog.numpy_dtype_to_tap(np.dtype("uint16")) == "int"  # 65535 overflows short
     assert catalog.numpy_dtype_to_tap(np.dtype("int32")) == "int"
     assert catalog.numpy_dtype_to_tap(np.dtype("int64")) == "long"
     assert catalog.numpy_dtype_to_tap(np.dtype("float32")) == "float"

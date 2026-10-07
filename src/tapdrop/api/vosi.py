@@ -19,11 +19,19 @@ from typing import TYPE_CHECKING
 from xml.sax.saxutils import escape, quoteattr
 
 from fastapi import APIRouter, Request, Response
+from starlette.concurrency import run_in_threadpool
 
+from tapdrop.adql import translate
 from tapdrop.api import dali_timestamp
+from tapdrop.engine import run_with_timeout
+from tapdrop.errors import TapdropError
 from tapdrop.output import CONTENT_TYPES
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Mapping
+
+    import duckdb
+
     from tapdrop.config import Settings
     from tapdrop.registry import ColumnMeta, Registry, TableMeta
 
@@ -100,8 +108,11 @@ def create_router(settings: Settings, registry: Registry) -> APIRouter:
 
     @router.get("/tap/examples")
     async def examples(request: Request) -> Response:
+        centers = await run_in_threadpool(
+            _example_centers, request.app.state.con, registry, settings
+        )
         return Response(
-            content=examples_document(registry, _base_url(settings, request)),
+            content=examples_document(registry, _base_url(settings, request), centers),
             media_type="text/html; charset=utf-8",
         )
 
@@ -307,14 +318,17 @@ def _column_element(column: ColumnMeta) -> str:
     return f"      <column>\n{body}\n      </column>"
 
 
-def examples_document(registry: Registry, base_url: str) -> str:
+def examples_document(
+    registry: Registry, base_url: str, centers: Mapping[str, tuple[float, float]] | None = None
+) -> str:
     """DALI examples as RDFa.
 
     Examples are generated from what was actually discovered, not from a canned
     list: an example that names a table this service does not have is worse than
     no examples at all.
     """
-    items = "\n".join(_example(meta, index) for index, meta in enumerate(_example_tables(registry)))
+    tables = _example_tables(registry)
+    items = "\n".join(_example(meta, index, centers or {}) for index, meta in enumerate(tables))
     body = items or "    <p>No tables were discovered, so there are no examples.</p>"
     return f"""<!DOCTYPE html>
 <html xmlns:vocab="http://www.ivoa.net/rdf/examples#">
@@ -337,14 +351,43 @@ def _example_tables(registry: Registry) -> list[TableMeta]:
     return (positional or tables)[:3]
 
 
-def _example(meta: TableMeta, index: int) -> str:
+def _example_centers(
+    con: duckdb.DuckDBPyConnection, registry: Registry, settings: Settings
+) -> dict[str, tuple[float, float]]:
+    """Cone centers that sit on data: each example table's first positioned row.
+
+    A fixed sky position returns nothing from a catalog that does not cover it,
+    and an example that returns no rows looks like a broken service.
+    """
+    centers: dict[str, tuple[float, float]] = {}
+    for meta in _example_tables(registry):
+        ra, dec = meta.ra_column, meta.dec_column
+        if not (ra and dec):
+            continue
+        adql = (
+            f"SELECT TOP 1 {ra}, {dec} FROM {meta.qualified_name} "
+            f"WHERE {ra} IS NOT NULL AND {dec} IS NOT NULL"
+        )
+        try:
+            sql = translate(adql, registry).sql
+            row = run_with_timeout(con, sql, float(settings.query_timeout)).table.to_pylist()
+        except TapdropError:
+            continue  # no cone for this table; _example falls back to first rows
+        if row:
+            first_ra, first_dec = row[0].values()
+            centers[meta.qualified_name] = (round(first_ra, 4), round(first_dec, 4))
+    return centers
+
+
+def _example(meta: TableMeta, index: int, centers: Mapping[str, tuple[float, float]]) -> str:
     name = meta.qualified_name
-    if meta.ra_column and meta.dec_column:
+    center = centers.get(name)
+    if meta.ra_column and meta.dec_column and center:
         title = f"Cone search on {name}"
         query = (
             f"SELECT TOP 100 * FROM {name}\n"
             f"WHERE CONTAINS(POINT('ICRS', {meta.ra_column}, {meta.dec_column}),\n"
-            f"               CIRCLE('ICRS', 10.68, 41.27, 0.5)) = 1"
+            f"               CIRCLE('ICRS', {center[0]}, {center[1]}, 0.5)) = 1"
         )
     else:
         title = f"First rows of {name}"

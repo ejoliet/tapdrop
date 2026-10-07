@@ -230,6 +230,10 @@ def test_examples_are_html_and_name_real_tables(client: TestClient) -> None:
 
 
 def test_example_queries_actually_run(client: TestClient) -> None:
+    import io
+
+    from astropy.io.votable import parse as parse_votable
+
     root = etree.fromstring(client.get("/tap/examples").content, etree.HTMLParser())
     queries = root.xpath("//pre[@property='query']/text()")
 
@@ -239,6 +243,8 @@ def test_example_queries_actually_run(client: TestClient) -> None:
             "/tap/sync", params={"REQUEST": "doQuery", "LANG": "ADQL", "QUERY": query}
         )
         assert response.status_code == 200, query
+        # A cone centered on a fixed sky position can miss the catalog entirely.
+        assert parse_votable(io.BytesIO(response.content)).get_first_table().array.size, query
 
 
 def test_vosi_routes_are_behind_the_token_prefix() -> None:

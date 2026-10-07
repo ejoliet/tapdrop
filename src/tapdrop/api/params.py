@@ -54,10 +54,10 @@ def parse_tap_request(params: Mapping[str, str] | Iterable[tuple[str, str]]) -> 
         if len(collected.get(name, [])) > 1:
             raise InvalidParameterError(name.upper(), "given more than once")
 
+    # TAP 1.1 §2.3 dropped REQUEST; TOPCAT talking to a 1.1 service omits it.
+    # A 1.0 client still sends it, and then it has to say doQuery.
     request = _one(collected, "request")
-    if request is None:
-        raise InvalidParameterError("REQUEST", "required, must be doQuery")
-    if request.lower() != "doquery":
+    if request is not None and request.lower() != "doquery":
         raise InvalidParameterError("REQUEST", f"expected doQuery, got {request!r}")
 
     lang = _one(collected, "lang")
