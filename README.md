@@ -1,20 +1,33 @@
 # tapdrop
 
-A temporary, standards-compliant IVOA TAP (Table Access Protocol) service over
-files in place. No database server, no import step: point it at a folder,
-an S3 prefix, or an HTTP URL and query the files directly with ADQL from
-pyvo, astroquery, or TOPCAT.
+[![CI](https://github.com/ejoliet/tapdrop/actions/workflows/ci.yml/badge.svg)](https://github.com/ejoliet/tapdrop/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 
-Under the hood: DuckDB scans the files, a `sqlglot`-based translator turns
-ADQL into DuckDB SQL, and FastAPI serves TAP 1.1, UWS, VOSI, SCS, TAP
-UPLOAD, and — with `--images` — ObsCore, SIA, DataLink, and SODA cutouts.
-See `RDD.md` for the full spec and `DEVELOPER.md` for local development and
-deployment.
+**Turn a folder of catalogs into an IVOA TAP service with one command.**
 
-Images are v1.1: `--images DIR` scans FITS headers (never pixel data) and
-publishes `ivoa.obscore`, `/sia/query`, `/datalink/links` and `/soda/sync`
-alongside the catalog tables. Roman ASDF discovery (`[roman]` extra) is the
-one v1.1 item still outstanding.
+Point tapdrop at local files, an S3 prefix, or an HTTP URL. It serves them
+in place as a standards-compliant TAP endpoint you can query with ADQL from
+TOPCAT, pyvo, astroquery, or Firefly. There is no database server and no
+import step, and the service can expire on its own.
+
+```bash
+uvx --from git+https://github.com/ejoliet/tapdrop tapdrop serve ./catalogs
+# → TAP endpoint at http://127.0.0.1:8000/tap
+```
+
+- **Catalogs**: Parquet, HATS, FITS tables, CSV/TSV/ECSV, VOTable. RA/Dec
+  detected automatically.
+- **Standards**: TAP 1.1, ADQL 2.1 (subset), UWS, VOSI, TAPRegExt, DALI
+  examples, Simple Cone Search, TAP UPLOAD.
+- **Images** (`--images`): FITS headers → ObsCore, SIA v2, DataLink, SODA
+  cutouts.
+- **Sharing**: public tunnel, secret-path token, and a time-to-live.
+
+Built on DuckDB (scans the files), sqlglot (ADQL → SQL), and FastAPI.
+
+> **Status:** pre-1.0. Tested with TOPCAT and pyvo; `stilts taplint`
+> still reports a few errors (see [Known issues](#known-issues)).
 
 ## Install
 
@@ -258,5 +271,9 @@ Every CLI flag has a matching `TAPDROP_<FLAG>` environment variable.
 
 ## More
 
-See `DEVELOPER.md` for running tests, adding an ADQL rule, and deploying to
-Docker, Cloud Run, or Hugging Face Spaces.
+- [`DEVELOPER.md`](DEVELOPER.md): running tests, adding an ADQL rule, and
+  deploying to Docker, Cloud Run, or Hugging Face Spaces.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md): how to send a change.
+- [`RDD.md`](RDD.md): the full spec and milestones.
+
+MIT licensed.
