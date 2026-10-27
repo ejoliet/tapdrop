@@ -20,7 +20,6 @@ import duckdb
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.responses import PlainTextResponse
 from starlette.concurrency import run_in_threadpool
-from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from tapdrop.adql import translate
 from tapdrop.api.datalink import router as datalink_router
@@ -28,7 +27,7 @@ from tapdrop.api.params import parse_tap_request
 from tapdrop.api.scs import router as scs_router
 from tapdrop.api.sia import router as sia_router
 from tapdrop.api.soda import router as soda_router
-from tapdrop.api.tapupload import uploaded_tables
+from tapdrop.api.tapupload import split_form, uploaded_tables
 from tapdrop.api.ui import UploadArea
 from tapdrop.api.ui import router as ui_router
 from tapdrop.api.uws import router as uws_router
@@ -90,8 +89,8 @@ def create_app(settings: Settings, registry: Registry, con: duckdb.DuckDBPyConne
     app.state.registry = registry
     app.state.con = con
     app.state.query_log = query_log
-    app.state.upload_lock = Lock()
     app.state.uws = JobManager(settings, registry, con, query_log=query_log)
+    app.state.upload_lock = app.state.uws.upload_lock  # one connection: one lock
 
     router = APIRouter()
 
@@ -101,17 +100,7 @@ def create_app(settings: Settings, registry: Registry, con: duckdb.DuckDBPyConne
 
     @router.post("/tap/sync")
     async def sync_post(request: Request) -> Response:
-        form = await request.form()
-        params: list[tuple[str, str]] = []
-        parts: dict[str, bytes] = {}
-        for name, value in form.multi_items():
-            if isinstance(value, StarletteUploadFile):
-                # An UPLOAD table travels as its own multipart part, referenced
-                # by name from the UPLOAD parameter (TAP 1.1 §2.5.2).
-                parts[name] = await value.read()
-            else:
-                params.append((name, str(value)))
-        params.extend(request.query_params.multi_items())
+        params, parts = await split_form(request)
         return await _handle_sync(request, params, parts)
 
     # The secret token is a path prefix, not a header: TOPCAT and other VO
@@ -260,6 +249,7 @@ def _run_query(
     parts: dict[str, bytes],
     maxrec: int,
     upload_lock: Lock,
+    timeout: float | None = None,
 ) -> QueryResult:
     """Translate and run one query, with any UPLOAD tables attached around it.
 
@@ -269,14 +259,16 @@ def _run_query(
     """
     if not tap_request.uploads:
         translation = translate(tap_request.query, registry)
-        return run_with_timeout(con, _with_maxrec(translation.sql, maxrec), _timeout(settings))
+        sql = _with_maxrec(translation.sql, maxrec)
+        return run_with_timeout(con, sql, timeout or _timeout(settings))
 
     with (
         upload_lock,
         uploaded_tables(tap_request.uploads, parts, con, registry, settings) as scoped,
     ):
         translation = translate(tap_request.query, scoped)
-        return run_with_timeout(con, _with_maxrec(translation.sql, maxrec), _timeout(settings))
+        sql = _with_maxrec(translation.sql, maxrec)
+        return run_with_timeout(con, sql, timeout or _timeout(settings))
 
 
 def _timeout(settings: Settings) -> float:

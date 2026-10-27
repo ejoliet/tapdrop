@@ -10,4 +10,5 @@ build/
 .coverage
 htmlcov/
 .omc/
+.serena/
 tapdrop.discovered.yaml

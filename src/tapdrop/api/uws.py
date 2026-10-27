@@ -25,6 +25,7 @@ from starlette.concurrency import run_in_threadpool
 
 from tapdrop.api import dali_timestamp
 from tapdrop.api.params import parse_tap_request
+from tapdrop.api.tapupload import split_form
 from tapdrop.errors import InvalidParameterError, TapdropError
 from tapdrop.output import content_type, votable_error
 from tapdrop.uws import Job, JobManager, Phase
@@ -52,13 +53,13 @@ async def async_list(request: Request) -> Response:
 
 @router.post("/tap/async")
 async def async_create(request: Request) -> Response:
-    form = await request.form()
-    params = [(name, str(value)) for name, value in form.multi_items()]
-    params.extend(request.query_params.multi_items())
-    return await _handle_create(request, params)
+    params, parts = await split_form(request)
+    return await _handle_create(request, params, parts)
 
 
-async def _handle_create(request: Request, params: list[tuple[str, str]]) -> Response:
+async def _handle_create(
+    request: Request, params: list[tuple[str, str]], parts: dict[str, bytes] | None = None
+) -> Response:
     settings: Settings = request.app.state.settings
     manager: JobManager = request.app.state.uws
     try:
@@ -70,7 +71,7 @@ async def _handle_create(request: Request, params: list[tuple[str, str]]) -> Res
     except TapdropError as exc:
         return _error_response(exc)
 
-    job = await run_in_threadpool(manager.create_job, tap_request)
+    job = await run_in_threadpool(manager.create_job, tap_request, parts)
     # TAP 1.1: a job creation request may include PHASE=RUN to start the job
     # immediately instead of requiring a separate POST to .../phase.
     if _first_param(params, "phase") == "RUN":

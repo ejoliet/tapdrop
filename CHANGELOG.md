@@ -113,6 +113,9 @@ All notable changes to tapdrop are recorded here. The format follows
   with a message naming what is supported, and capabilities advertise
   `upload-inline` alone. Requires `--allow-upload` and obeys
   `TAPDROP_UPLOAD_MAX_MB`.
+- M6.1 (async UPLOAD): `/tap/async` keeps the `UPLOAD` parameter and its
+  multipart parts on the job and attaches `tap_upload.*` when the job runs,
+  under the same lock as sync. Clears taplint `E-UPL-QERR`.
 - M6: the query log. `--log-dir` records every sync request and async job -
   timestamp, endpoint, query, format, effective `MAXREC`, rows returned,
   elapsed time, status and error - into a DuckDB table that is itself

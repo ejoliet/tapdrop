@@ -23,14 +23,13 @@ import secrets
 import threading
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from tapdrop.adql import translate as translate_adql
-from tapdrop.engine import QueryResult, run_with_timeout
+from tapdrop.engine import QueryResult
 from tapdrop.errors import InvalidParameterError, QueryTimeoutError, TapdropError
 from tapdrop.output import serialize
 from tapdrop.querylog import QueryLog, QueryRecord, token_hash
@@ -96,6 +95,7 @@ class Job:
     result_size: int | None = None
     result_rows: int | None = None
     cancel_requested: bool = False
+    upload_parts: dict[str, bytes] = field(default_factory=dict)
 
     def transition(self, new_phase: Phase) -> None:
         """Move to *new_phase*, raising if the UWS state diagram forbids it."""
@@ -117,12 +117,18 @@ def _run_query_via_engine(manager: JobManager, job: Job) -> QueryResult:
     # Local import: avoids a cycle (api.tap imports uws to mount the router)
     # and reuses the sync endpoint's exact MAXREC-wrapping helper, per the
     # task's instruction not to reinvent it.
-    from tapdrop.api.tap import _with_maxrec
+    from tapdrop.api.tap import _run_query
 
-    translation = translate_adql(job.request.query, manager.registry)
-    sql = _with_maxrec(translation.sql, job.request.effective_maxrec(manager.settings))
-    timeout = min(job.execution_duration, float(manager.settings.async_query_timeout))
-    return run_with_timeout(manager.con, sql, timeout)
+    return _run_query(
+        manager.con,
+        manager.registry,
+        manager.settings,
+        job.request,
+        job.upload_parts,
+        job.request.effective_maxrec(manager.settings),
+        manager.upload_lock,
+        min(job.execution_duration, float(manager.settings.async_query_timeout)),
+    )
 
 
 class _AbortedError(Exception):
@@ -151,15 +157,17 @@ class JobManager:
         self._jobs: dict[str, Job] = {}
         self._futures: dict[str, Future[None]] = {}
         self._lock = threading.Lock()
+        self.upload_lock = threading.Lock()
         self._executor = ThreadPoolExecutor(
             max_workers=max(1, settings.max_jobs), thread_name_prefix="tapdrop-uws"
         )
 
-    def create_job(self, tap_request: TapRequest) -> Job:
+    def create_job(self, tap_request: TapRequest, parts: dict[str, bytes] | None = None) -> Job:
         now = self._clock()
         job = Job(
             job_id=secrets.token_urlsafe(16),
             request=tap_request,
+            upload_parts=parts or {},
             creation_time=now,
             execution_duration=float(self.settings.async_query_timeout),
             destruction=now + timedelta(hours=_DEFAULT_DESTRUCTION_HOURS),

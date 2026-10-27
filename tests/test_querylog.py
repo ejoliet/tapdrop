@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -75,6 +76,10 @@ def test_an_async_job_is_recorded(client: TestClient) -> None:
     created = client.post("/t/s3cr3t/tap/async", data=QUERY, follow_redirects=False)
     job_url = created.headers["location"]
     client.post(f"{job_url}/phase", data={"PHASE": "RUN"})
+    deadline = time.monotonic() + 10
+    while client.get(f"{job_url}/phase").text not in ("COMPLETED", "ERROR"):
+        assert time.monotonic() < deadline, "async job did not finish"
+        time.sleep(0.05)
 
     async_rows = [row for row in _rows(client) if row[0] == "async"]
     assert len(async_rows) == 1

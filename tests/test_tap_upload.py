@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -127,3 +128,26 @@ def test_unreadable_upload_content_is_reported_not_registered(client: TestClient
 
     assert response.status_code == 400
     assert b"UPLOAD" in response.content
+
+
+def test_an_async_job_can_join_against_an_uploaded_table(client: TestClient) -> None:
+    """M6.1 (E-UPL-QERR): pyvo and TOPCAT upload through ``/tap/async``."""
+    created = client.post(
+        "/tap/async",
+        data={
+            "REQUEST": "doQuery",
+            "LANG": "ADQL",
+            "QUERY": "SELECT * FROM tap_upload.mine",
+            "UPLOAD": "mine,param:t1",
+            "PHASE": "RUN",
+        },
+        files={"t1": ("mine.vot", VOTABLE, "application/x-votable+xml")},
+        follow_redirects=False,
+    )
+    job_url = created.headers["location"]
+    deadline = time.monotonic() + 10
+    while (phase := client.get(f"{job_url}/phase").text) not in ("COMPLETED", "ERROR"):
+        assert time.monotonic() < deadline, "async job did not finish"
+        time.sleep(0.05)
+
+    assert phase == "COMPLETED", client.get(f"{job_url}/error").text

@@ -5,8 +5,8 @@ against it as ``tap_upload.<name>``. Unlike the drag-drop ingest in ``ui.py``,
 which adds a table to the service for everyone, an uploaded table is torn down
 as soon as the query that used it has been answered.
 
-Sync only, per RDD.md's ADQL support matrix ("TAP UPLOAD (``tap_upload.*``):
-sync, size-capped").
+Sync and async (M6.1): an async job keeps its multipart parts and attaches the
+tables when it runs, under the same lock as sync.
 """
 
 from __future__ import annotations
@@ -18,6 +18,8 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from starlette.datastructures import UploadFile as StarletteUploadFile
+
 from tapdrop.discovery import discover
 from tapdrop.errors import InvalidParameterError, UploadTooLargeError
 from tapdrop.registry import Registry, TableMeta
@@ -26,10 +28,11 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Iterator, Mapping
 
     import duckdb
+    from starlette.requests import Request
 
     from tapdrop.config import Settings
 
-__all__ = ["UPLOAD_SCHEMA", "uploaded_tables"]
+__all__ = ["UPLOAD_SCHEMA", "split_form", "uploaded_tables"]
 
 #: The schema name TAP fixes for uploaded tables.
 UPLOAD_SCHEMA = "tap_upload"
@@ -37,6 +40,24 @@ UPLOAD_SCHEMA = "tap_upload"
 #: TAP 1.1 §2.5.2 sends the table itself as a multipart part named by the
 #: ``param:`` half of the UPLOAD value.
 _INLINE_PREFIX = "param:"
+
+
+async def split_form(request: Request) -> tuple[list[tuple[str, str]], dict[str, bytes]]:
+    """Split a POST into text parameters and multipart parts (TAP 1.1 §2.5.2).
+
+    An UPLOAD table travels as its own part, referenced by name from the
+    UPLOAD parameter.
+    """
+    form = await request.form()
+    params: list[tuple[str, str]] = []
+    parts: dict[str, bytes] = {}
+    for name, value in form.multi_items():
+        if isinstance(value, StarletteUploadFile):
+            parts[name] = await value.read()
+        else:
+            params.append((name, str(value)))
+    params.extend(request.query_params.multi_items())
+    return params, parts
 
 
 @contextmanager

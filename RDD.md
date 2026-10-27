@@ -241,7 +241,7 @@ All paths are relative to the service root (`/` or `/t/<token>/`).
 | `CONTAINS(POINT, CIRCLE)` | ✅ | | Haversine + dec band prefilter + HEALPix pruning when available |
 | `COORDSYS`, `COORD1`, `COORD2` | ✅ | | ICRS only; others → error |
 | `BOX`, `POLYGON`, `INTERSECTS`, `REGION` | ❌ | ✅ for `ivoa.ObsCore.s_region` | Spherical polygon UDF (v1.1) |
-| TAP UPLOAD (`tap_upload.*`) | ✅ sync, size-capped | | VOTable → temp DuckDB table |
+| TAP UPLOAD (`tap_upload.*`) | ✅ sync + async, size-capped | | VOTable → temp DuckDB table |
 | Non-ICRS frames | ❌ | ❌ | Explicit error |
 
 Unsupported constructs return a VOTable error with `QUERY_STATUS=ERROR` and a message naming the construct.
@@ -477,11 +477,11 @@ git tag v1.0.0 && git push --tags     # then push image to ghcr.io/ejoliet/tapdr
 
 #### M6.1 — taplint clean, async UPLOAD
 
-Status: open. `stilts taplint` against the 2026-10-06 build (Gaia HATS shards, `--allow-upload`) reports 23 errors, 0 warnings, 2 failures. This milestone clears the errors so the v1.0 acceptance box can be ticked.
+Status: in progress. Async UPLOAD is done (tests green; taplint not yet re-run, so `E-UPL-QERR` is unconfirmed). Six items remain. `stilts taplint` against the 2026-10-06 build (Gaia HATS shards, `--allow-upload`) reported 23 errors, 0 warnings, 2 failures. This milestone clears the errors so the v1.0 acceptance box can be ticked.
 
 | Agent deliverable | taplint code | Done when |
 |---|---|---|
-| **Async UPLOAD**: `/tap/async` keeps the `UPLOAD` parameter and its multipart parts on the job and attaches `tap_upload.*` when the job runs (today only `/tap/sync` does; an async job fails with `Unknown table 'tap_upload.t1'`). pyvo and TOPCAT upload through async | `E-UPL-QERR` ×2 | Async UPLOAD cross-match test; pyvo `submit_job(..., uploads=...)` live test |
+| ✅ **Async UPLOAD**: `/tap/async` keeps the `UPLOAD` parameter and its multipart parts on the job and attaches `tap_upload.*` when the job runs (today only `/tap/sync` does; an async job fails with `Unknown table 'tap_upload.t1'`). pyvo and TOPCAT upload through async | `E-UPL-QERR` ×2 | Async UPLOAD cross-match test; pyvo `submit_job(..., uploads=...)` live test |
 | `TAP_SCHEMA.columns."size"` (int), the TAP 1.1 §4.3 name for `arraysize` | `E-TMS-TSC0`, `E-TMS-CRSV`, `E-TME-CRSV` | Column present in TAP_SCHEMA and `/tap/tables` |
 | Standard TAP_SCHEMA foreign keys in `TAP_SCHEMA.keys` / `key_columns`: tables→schemas, columns→tables, keys→tables (from, target), key_columns→keys | `E-TMS-TSLN` ×5 | The 5 keys are queryable |
 | Column names that are not ADQL regular identifiers (HATS `_healpix_29`) published delimited (`"_healpix_29"`) in TAP_SCHEMA and VOSI tables, and accepted delimited by the translator | `E-TMS-CNID`, `E-TME-CNID` | Query on `"_healpix_29"` round-trips; see Open Questions |
@@ -618,7 +618,16 @@ git tag v1.1.0 && git push --tags
 
 M0–M7 and M9–M11 are implemented; M8 is not. Current order:
 
-1. **M6.1** — async UPLOAD first (real clients break on it), then the small TAP_SCHEMA, UWS, and examples fixes, until `taplint` reports 0 errors. Decide the `_healpix_29` question before starting.
+1. **M6.1** — async UPLOAD is done. Remaining, in this order, each as its own red/green pass:
+   1. `TAP_SCHEMA.columns."size"`.
+   2. `/tap/examples` in capabilities, plus the RDFa vocab.
+   3. Async job creation always answers 303; a bad `LANG`/`QUERY` ends the job in `ERROR`.
+   4. UWS 1.1 §2.2.3: `POST ACTION=DELETE`, and `POST` to `/parameters` while `PENDING`.
+   5. Standard `TAP_SCHEMA.keys` / `key_columns` foreign keys.
+   6. Delimited identifiers (`"_healpix_29"`); needs the Open Question answered first.
+
+   Route 3 and 4 through `ivoa-conformance`, 6 through `adql-translator`. Then re-run `stilts taplint` (Emmanuel) until 0 errors.
+   Follow-up: an async job keeps its upload bytes until the job is destroyed (default 24 h); release them when the job reaches a terminal phase.
 2. Tick the **v1.0 acceptance** list (TOPCAT, pyvo, `uvx` on clean macOS/Linux, S3 sources, token/TTL/share), then tag `v1.0.0`.
 3. Decide the S3 result store question (v1.0 or v2).
 4. Collect 2–3 Roman L2/L3 sample files and the `roman_datamodels` version, then **M8**.

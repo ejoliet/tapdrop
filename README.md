@@ -262,7 +262,8 @@ Every CLI flag has a matching `TAPDROP_<FLAG>` environment variable.
 
 ## Known issues
 
-- `stilts taplint` still reports errors: async UPLOAD (above), TAP_SCHEMA's
+- Async `UPLOAD` works (`/tap/async` keeps the multipart parts). `stilts taplint` has not been re-run since.
+- `stilts taplint` still reports errors: TAP_SCHEMA's
   `size` column and standard foreign keys, HATS `_healpix_29` not delimited,
   two UWS POST forms, async job creation answering 400 instead of 303, and
   the examples endpoint not declared. Tracked as milestone M6.1 in `RDD.md`.

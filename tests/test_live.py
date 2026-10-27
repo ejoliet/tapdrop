@@ -128,6 +128,24 @@ def test_pyvo_uploads_a_table_and_joins_against_it(tap: object) -> None:
     assert sorted(result["ra"]) == [10.0, 11.0]
 
 
+def test_pyvo_uploads_a_table_through_an_async_job(tap: object) -> None:
+    from astropy.table import Table
+
+    mine = Table({"ra": [10.0, 11.0], "dec": [41.0, 42.0]})
+
+    job = tap.submit_job(  # type: ignore[attr-defined]
+        "SELECT ra, dec FROM tap_upload.mine", uploads={"mine": mine}
+    )
+    try:
+        job.run()
+        job.wait(phases={"COMPLETED", "ERROR", "ABORTED"}, timeout=120)
+
+        assert job.phase == "COMPLETED"
+        assert len(job.fetch_result().to_table()) == 2
+    finally:
+        job.delete()
+
+
 def test_a_deleted_job_is_gone(tap: object) -> None:
     import pyvo
 
